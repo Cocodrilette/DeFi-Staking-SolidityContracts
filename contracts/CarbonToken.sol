@@ -28,6 +28,11 @@ contract CarbonToken {
         uint256 _amount
     );
 
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    }
+
     // Functions
     constructor() {
         balanceOf[msg.sender] = TOTAL_SUPPLY;
@@ -38,23 +43,23 @@ contract CarbonToken {
         public
         returns (bool success)
     {
-        allowance[msg.sender][_spender] = _amount * 10**DECIMALS;
+        allowance[msg.sender][_spender] = fixAmount(_amount);
 
-        emit Approval(msg.sender, _spender, _amount * 10**DECIMALS);
+        emit Approval(msg.sender, _spender, _amount);
 
         return true;
     }
 
     function transfer(address _to, uint256 _amount) public returns (bool) {
-        require(
-            balanceOf[msg.sender] >= _amount * 10**DECIMALS,
-            "Insufficient funds."
-        );
+        uint256 fixedAmount = fixAmount(_amount);
+        /// You need to send almost 1 token
+        require(fixedAmount > 0, "You must send almost 1 token");
+        require(balanceOf[msg.sender] >= fixedAmount, "Insufficient funds.");
 
-        balanceOf[msg.sender] -= _amount * 10**DECIMALS;
-        balanceOf[_to] += _amount * 10**DECIMALS;
+        balanceOf[msg.sender] -= fixedAmount;
+        balanceOf[_to] += fixedAmount;
 
-        emit Transfer(msg.sender, _to, _amount * 10**DECIMALS);
+        emit Transfer(msg.sender, _to, _amount);
 
         return true;
     }
@@ -64,21 +69,23 @@ contract CarbonToken {
         address _to,
         uint256 _amount
     ) public returns (bool) {
+        uint256 fixedAmount = fixAmount(_amount);
+        require(balanceOf[_from] >= fixedAmount, "Insufficient funds.");
         require(
-            balanceOf[_from] >= _amount * 10**DECIMALS,
-            "Insufficient funds."
-        );
-        require(
-            allowance[_from][msg.sender] >= _amount * 10**DECIMALS,
+            allowance[_from][msg.sender] >= fixedAmount,
             "Insufficient funds approved."
         );
 
-        balanceOf[_from] -= _amount * 10**DECIMALS;
-        balanceOf[_to] += _amount * 10**DECIMALS;
-        allowance[_from][msg.sender] -= _amount * 10**DECIMALS;
+        balanceOf[_from] -= fixedAmount;
+        balanceOf[_to] += fixedAmount;
+        allowance[_from][msg.sender] -= fixedAmount;
 
-        emit Transfer(_from, _to, _amount * 10**DECIMALS);
+        emit Transfer(_from, _to, _amount);
 
         return true;
+    }
+
+    function fixAmount(uint256 _amount) private pure returns(uint256) {
+        return _amount * 10**DECIMALS;
     }
 }

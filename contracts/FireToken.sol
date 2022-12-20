@@ -16,6 +16,7 @@ contract FireToken {
 
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+    mapping(address => bool) public alreadyClaim;
 
     address public owner;
 
@@ -34,21 +35,28 @@ contract FireToken {
         owner = msg.sender;
     }
 
-    function approve(address _spender, uint256 _amount) public returns (bool success) {
-        allowance[msg.sender][_spender] = _amount * 10**DECIMALS;
+    function approve(address _spender, uint256 _amount)
+        public
+        returns (bool success)
+    {
+        allowance[msg.sender][_spender] = fixAmount(_amount);
 
-        emit Approval(msg.sender, _spender, _amount * 10**DECIMALS);
+        emit Approval(msg.sender, _spender, _amount);
 
         return true;
-    } 
+    }
 
     function transfer(address _to, uint256 _amount) public returns (bool) {
-        require(balanceOf[msg.sender] >= _amount * 10**DECIMALS, "Insufficient funds.");
+        /// You need to send almost 1 token
+        uint256 fixedAmount = fixAmount(_amount);
 
-        balanceOf[msg.sender] -= _amount * 10**DECIMALS;
-        balanceOf[_to] += _amount * 10**DECIMALS;
+        require(fixedAmount > 0, "You must send almost 1 token");
+        require(balanceOf[msg.sender] >= fixedAmount, "Insufficient funds.");
 
-        emit Transfer(msg.sender, _to, _amount * 10**DECIMALS);
+        balanceOf[msg.sender] -= fixedAmount;
+        balanceOf[_to] += fixedAmount;
+
+        emit Transfer(msg.sender, _to, _amount);
 
         return true;
     }
@@ -58,18 +66,38 @@ contract FireToken {
         address _to,
         uint256 _amount
     ) public returns (bool) {
-        require(balanceOf[_from] >= _amount * 10**DECIMALS, "Insufficient funds.");
+        uint256 fixedAmount = fixAmount(_amount);
+
+        require(balanceOf[_from] >= fixedAmount, "Insufficient funds.");
         require(
-            allowance[_from][msg.sender] >= _amount * 10**DECIMALS,
+            allowance[_from][msg.sender] >= fixedAmount,
             "Insufficient funds approved."
         );
 
-        balanceOf[_from] -= _amount * 10**DECIMALS;
-        balanceOf[_to] += _amount * 10**DECIMALS;
-        allowance[_from][msg.sender] -= _amount * 10**DECIMALS;
+        balanceOf[_from] -= fixedAmount;
+        balanceOf[_to] += fixedAmount;
+        allowance[_from][msg.sender] -= fixedAmount;
 
-        emit Transfer(_from, _to, _amount * 10**DECIMALS);
+        emit Transfer(_from, _to, _amount);
 
         return true;
+    }
+
+    // Send 1000 tokens to the sender only once
+    function claimTokens() public {
+        address sender = msg.sender;
+
+        if (!alreadyClaim[sender]) {
+            alreadyClaim[sender] = true;
+
+            balanceOf[sender] = fixAmount(1000);
+            return;
+        }
+
+        revert();
+    }
+
+    function fixAmount(uint256 _amount) private pure returns (uint256) {
+        return _amount * 10**DECIMALS;
     }
 }
